@@ -1,0 +1,27 @@
+[Unit]
+Description=Task Scene Duplicate Search MVP
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/task-dedup/app
+EnvironmentFile=-/etc/task-scene-dedup.env
+Environment=PYTHONUNBUFFERED=1
+Environment=DEDUP_DATA_DIR=/opt/task-dedup/data
+Environment=DEDUP_FFMPEG=/opt/micromamba/root/envs/task-dedup/bin/ffmpeg
+Environment=DEDUP_FFPROBE=/opt/micromamba/root/envs/task-dedup/bin/ffprobe
+Environment=DEDUP_TORCH_THREADS=4
+Environment=OSS_ENDPOINT=https://oss-cn-shenzhen.aliyuncs.com
+Environment=DEDUP_ALLOWED_OSS_BUCKETS=egoscale-v3
+Environment=DEDUP_SIGNED_URL_TTL=900
+Environment=DEDUP_LABEL_POOL_DIR=/opt/task-dedup/labeling/pool
+Environment=DEDUP_LABEL_DB=/opt/task-dedup/labeling/study.sqlite3
+ExecStart=/opt/micromamba/root/envs/task-dedup/bin/python -m uvicorn scene_dedup.app:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
