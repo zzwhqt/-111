@@ -218,37 +218,11 @@ fetch('/study/errors/api/next').then(r=>r.json()).then(render).catch(e=>{workspa
 </script></body></html>"""
 
 
-_ERROR_HTML_SAFARI = _ERROR_HTML
-for _source, _target in (
-    ('<html lang="zh-CN">', '<html lang="en">'),
-    ('<title>场景模型错题分析</title>', '<title>Scene Model Error Analysis</title>'),
-    ('场景模型错题分析</b>', 'Scene Model Error Analysis</b>'),
-    ('读取中', 'Loading'),
-    ('模型第一名为什么不是人工最优？', 'Why is the model top result not the human-preferred result?'),
-    ('这里只展示前80条开发数据中的排序错题；后40条测试数据保持锁定。', 'Only ranking errors from the first 80 development queries are shown. The remaining 40 test queries stay locked.'),
-    ('同类场景，但不是同一地点', 'Same scene type, different place'),
-    ('被动作或工具干扰', 'Biased by action or tools'),
-    ('人物/遮挡影响', 'Person or occlusion'),
-    ('角度或光线变化', 'Viewpoint or lighting change'),
-    ('漏掉更相似的候选', 'Missed a more similar candidate'),
-    ('人工标签有歧义', 'Ambiguous human label'),
-    ('这条不算模型错误', 'Not a model error'),
-    ('其他原因', 'Other'),
-    ('场景：', 'Scene: '),
-    ('任务：', 'Task: '),
-    ('详情：', 'Details: '),
-    ('暂无', 'Unavailable'),
-    ('已分析 ', 'Reviewed '),
-    (' · 锁定测试40条', ' · 40 test queries locked'),
-    ('错题分析已完成', 'Error review complete'),
-    ('查询视频', 'Query video'),
-    ('模型第一名', 'Model top result'),
-    ('模型余弦 ', 'Model cosine '),
-    (' · 人工等级 ', ' · Human grade '),
-    ('人工认为更好的候选', 'Human-preferred candidate'),
-    ('↺ 从Task开头播放', '↺ Replay from task start'),
-    ('可选：补充具体原因', 'Optional: add details'),
-    ('保存原因并查看下一条', 'Save reason and show next'),
-    ('加载失败：', 'Loading failed: '),
-):
-    _ERROR_HTML_SAFARI = _ERROR_HTML_SAFARI.replace(_source, _target)
+_ERROR_HTML_SAFARI = (
+    _ERROR_HTML.replace('<html lang="zh-CN">', '<html lang="en">')
+    .replace('<body>', '<body translate="no">')
+    .replace(
+        "d.className='desc';d.textContent=desc(asset)",
+        "d.className='desc';d.lang='en';d.setAttribute('translate','yes');d.textContent=desc(asset)",
+    )
+)
