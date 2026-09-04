@@ -17,6 +17,7 @@ from .core import ClipEncoder, DATA_DIR, IndexStore, encode_video, validate_remo
 from .label_study import POOL_DIR as LABEL_POOL_DIR
 from .label_study import router as label_router
 from .multimodal_study import router as multimodal_study_router
+from .scene_errors import router as scene_errors_router
 
 
 app = FastAPI(title="Task Scene Duplicate Search MVP", version="0.2.0")
@@ -32,6 +33,7 @@ app.mount(
 )
 app.include_router(label_router)
 app.include_router(multimodal_study_router)
+app.include_router(scene_errors_router)
 
 
 @lru_cache(maxsize=1)
