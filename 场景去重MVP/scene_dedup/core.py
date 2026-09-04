@@ -295,7 +295,9 @@ class IndexStore:
             q_to_c = float(pairwise.max(axis=1).mean())
             c_to_q = float(pairwise.max(axis=0).mean())
             frame_coverage = (q_to_c + c_to_q) / 2.0
-            visual_similarity = 0.65 * float(raw_score) + 0.35 * frame_coverage
+            # Pure-visual ranking weights selected on the frozen 80-query
+            # development split, then checked once on the 40-query holdout.
+            visual_similarity = 0.60 * float(raw_score) + 0.40 * frame_coverage
             corpus_percentile = float(
                 100.0
                 * np.searchsorted(self.visual_negative_scores, raw_score, side="right")
@@ -318,13 +320,13 @@ class IndexStore:
             else:
                 text_alignment = float(query_task @ self.text_vectors[idx])
                 text_distinctiveness = None
-                combined = 0.70 * visual_distinctiveness + 0.30 * frame_coverage
-                score_mode = "video_only_corpus_normalized"
+                combined = visual_similarity
+                score_mode = "video_only_60_task_40_frame"
             combined = float(np.clip(combined, 0.0, 1.0))
             similarity_percent = float(np.clip(combined, 0.0, 1.0) * 100.0)
             if float(raw_score) >= 0.995 and frame_coverage >= 0.98:
                 warning = "high"
-            elif similarity_percent >= 55.0 or corpus_percentile >= 99.0:
+            elif corpus_percentile >= 99.0:
                 warning = "review"
             else:
                 warning = "low"

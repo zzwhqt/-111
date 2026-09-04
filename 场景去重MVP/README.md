@@ -1,24 +1,24 @@
 # Task 场景重复检索 MVP
 
-这是一个 CPU-only 的 Task 级视频场景去重原型：对每个已切分的动作片段抽取 8 帧，用 CLIP ViT-B/32 生成视觉向量；同时对 Task JSON 中的 `scene + task_name + details` 生成文本向量。系统用 Faiss `IndexFlatIP` 做精确视觉余弦召回，再融合双向帧覆盖度和视频—文本跨模态匹配重排 Top-K。
+这是一个 CPU-only 的 Task 级视频场景去重原型：对每个已切分的动作片段抽取 8 帧，用 CLIP ViT-B/32 生成视觉向量。正式检索链路用 Faiss `IndexFlatIP` 做整体视觉余弦召回，再按“整体向量 60% + 双向逐帧覆盖 40%”进行纯视觉重排。`scene/task_name/details` 只作为结果解释信息展示，不参与正式召回、排序或打分。
 
 ## 分数定义
 
 - `raw_cosine`：整个 Task 聚合向量的余弦相似度。
 - `frame_coverage`：查询和候选各 8 个帧向量构成 `8×8` 余弦矩阵，计算查询→候选与候选→查询的逐帧最佳匹配均值。它准确说是“双向最佳帧匹配”，不检查帧的时序顺序，不等于动作时长覆盖率。
-- `text_alignment`：查询携带 Task 描述时，它是“查询描述文本向量”与“候选 `scene+task_name+details` 文本向量”的余弦，并参与最终分数。未携带描述时，API 返回查询视频向量与候选文本向量的 CLIP 跨模态余弦作为诊断项，但它不参与当前 `video_only` 最终分数。
-- `visual_similarity`：`0.65 * raw_cosine + 0.35 * frame_coverage`。
+- `text_alignment`：保留的诊断字段，不参与正式纯视觉链路的召回、排序或打分。
+- `visual_similarity`：`0.60 * raw_cosine + 0.40 * frame_coverage`，权重由前80条开发集选择并在后40条保留集上做一次验收。
 - `corpus_percentile`：候选整体视觉余弦在当前库的所有非自匹配对中所处百分位。
-- `similarity_percent`：先用库内随机负对 p95 对整体视觉余弦做归一化，再融合帧覆盖度。未提供 Task 描述时权重为视觉显著性 70% + 帧覆盖 30%；提供描述时为视觉显著性 55% + 帧覆盖 25% + 文本显著性 20%。该分数只是库内归一化的 MVP 检索分，不是重复概率。
-- `warning_level`：只有 `raw_cosine>=0.995 且 frame_coverage>=0.98` 才直接 `high`；库内归一化分较高或处于随机负对 p99 以上时为 `review`，其余为 `low`。生产化前必须用业务标注对学习概率和阈值。
+- `similarity_percent`：`visual_similarity * 100`。它是纯视觉排序分，不是重复概率。
+- `warning_level`：只有 `raw_cosine>=0.995 且 frame_coverage>=0.98` 才直接 `high`；整体视觉余弦处于库内随机负对 p99 以上时为 `review`，其余为 `low`。生产化前仍需用更大规模业务标注校准概率和阈值。
 
 ## API
 
 - `GET /`：视频地址 + Task 帧范围检索页，会展示并播放 Top-K 候选片段。
 - `GET /health`：健康检查。
 - `GET /stats`：索引统计。
-- `POST /search/upload`：上传已截取的 Task 视频，可选表单字段 `description`。
-- `POST /search/url`：传入裸 `oss://bucket/key` 或 OSS 签名 HTTPS URL；推荐使用 `start_frame/end_frame/fps/description`，帧区间为 `[start_frame, end_frame)`。为了向后兼容，仍支持 `start_seconds/end_seconds`。
+- `POST /search/upload`：上传已截取的 Task 视频。历史 `description` 表单字段为兼容保留，但会被忽略。
+- `POST /search/url`：传入裸 `oss://bucket/key` 或 OSS 签名 HTTPS URL；推荐使用 `start_frame/end_frame/fps`，帧区间为 `[start_frame, end_frame)`。为了向后兼容，仍支持 `start_seconds/end_seconds`，并接受但忽略历史 `description` 字段。
 
 ## 2000 Task 人工盲标评测
 
@@ -38,13 +38,15 @@
 - `GET /study/api/scene-report`在600对完成前隐藏模型指标；完成后给出分级NDCG@5、Top-1人工场景等级、等级≥2命中率和四象限分层结果。
 - `GET /study/errors`：场景轮完成后的错题分析页。固定前80个查询为开发数据，只展示模型余弦Top-1低于人工最佳等级的排序错误；可对“同类异地、动作/工具干扰、人物遮挡、角度/光照”等根因进行归类。后40个查询不进入错题页，作为后续锁定测试数据。
 - `GET /study/errors/safari`：Safari自带翻译专用英文版本。Safari按整页语言决定是否显示翻译按钮，因此该页面保持完整英文以可靠触发地址栏翻译；中文错题页仍保留在`/study/errors`。
+- `GET /study/rerank`：文本优先召回V2实验页。前80个开发查询重新与全部100个参考资产计算，按文本70%+视觉30%展示新Top-5，并与旧视觉Top-1对照；接口同时在原5候选人工标签上扫描0%～100%的文本权重，避免把主观权重直接当成最优结论。
+- `GET /study/visual-eval`：正式纯视觉评测页。120个查询、600个Pair标签固定复用；前80条只用于选算法与权重，后40条锁定验收。该页比较整体Task余弦、双向逐帧覆盖以及不同纯视觉融合权重。
 - 数据设计、四轮标注口径和后续融合路线见[多模态Task去重MVP整体计划.md](./多模态Task去重MVP整体计划.md)。
 
-如果上游 Task JSON 已有 `scene/task_name/details`，查询时应同时传入 canonical description，以启用文本—文本精排。仅传视频时，同一批头戴相机与相似环境会导致 CLIP 向量聚簇，只适合做候选召回，不足以独立完成细粒度工作语义判定。
+当前目标是先把场景视觉模块独立做精，因此正式接口刻意禁止文字参与。文本重排仅保留为隔离实验，不得用它覆盖纯视觉基准成绩。
 
 开发环境默认只监听 `127.0.0.1:8000`。部署到测试服务器后，systemd 会将服务监听在 `0.0.0.0:8000`，可直接打开：
 
-`http://112.74.108.93:8000/study`
+`http://112.74.108.93:8000/study/visual-eval`
 
 若云安全组未放行 8000 端口，需先添加 TCP 入站规则；本地开发仍可建立 SSH 隧道：
 
