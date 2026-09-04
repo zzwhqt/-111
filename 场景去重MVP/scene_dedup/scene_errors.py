@@ -134,6 +134,12 @@ def error_home() -> str:
     return _ERROR_HTML
 
 
+@router.get("/safari", response_class=HTMLResponse)
+def safari_translation_home() -> str:
+    """English document variant so Safari offers its built-in page translation."""
+    return _ERROR_HTML_SAFARI
+
+
 @router.get("/api/next")
 def next_error() -> dict[str, Any]:
     with _connect() as connection:
@@ -210,3 +216,39 @@ function update(p){count.textContent=`已分析 ${p.reviewed_errors}/${p.total_e
 function render(data){update(data.progress);if(data.complete){fetch('/study/errors/api/summary').then(r=>r.json()).then(s=>{workspace.innerHTML='<div class="card empty"><h2>错题分析已完成</h2><div class="summary">'+JSON.stringify(s.reason_counts,null,2)+'</div></div>'});return}current=data.case;reason='';const grid=document.createElement('div');grid.className='grid';grid.append(card('查询视频',current.query,''),card('模型第一名',current.model_top,`模型余弦 ${current.model_score} · 人工等级 ${current.model_grade}`),card('人工认为更好的候选',current.human_best,`模型余弦 ${current.better_score} · 人工等级 ${current.best_grade}`));const review=document.createElement('section');review.className='review';const reasons=document.createElement('div');reasons.className='reasons';const buttons=[];for(const [code,text] of Object.entries(labels)){const b=document.createElement('button');b.textContent=text;b.onclick=()=>{reason=code;buttons.forEach(x=>x.classList.toggle('selected',x===b));submit.disabled=false};buttons.push(b);reasons.append(b)}const note=document.createElement('textarea');note.placeholder='可选：补充具体原因';const submit=document.createElement('button');submit.className='submit';submit.disabled=true;submit.textContent='保存原因并查看下一条';submit.onclick=async()=>{submit.disabled=true;const r=await fetch('/study/errors/api/review',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query_task_id:current.query_task_id,reason_code:reason,note:note.value})});render(await r.json())};review.append(reasons,note,submit);workspace.replaceChildren(grid,review)}
 fetch('/study/errors/api/next').then(r=>r.json()).then(render).catch(e=>{workspace.innerHTML='<div class="card empty">加载失败：'+e.message+'</div>'});
 </script></body></html>"""
+
+
+_ERROR_HTML_SAFARI = _ERROR_HTML
+for _source, _target in (
+    ('<html lang="zh-CN">', '<html lang="en">'),
+    ('<title>场景模型错题分析</title>', '<title>Scene Model Error Analysis</title>'),
+    ('场景模型错题分析</b>', 'Scene Model Error Analysis</b>'),
+    ('读取中', 'Loading'),
+    ('模型第一名为什么不是人工最优？', 'Why is the model top result not the human-preferred result?'),
+    ('这里只展示前80条开发数据中的排序错题；后40条测试数据保持锁定。', 'Only ranking errors from the first 80 development queries are shown. The remaining 40 test queries stay locked.'),
+    ('同类场景，但不是同一地点', 'Same scene type, different place'),
+    ('被动作或工具干扰', 'Biased by action or tools'),
+    ('人物/遮挡影响', 'Person or occlusion'),
+    ('角度或光线变化', 'Viewpoint or lighting change'),
+    ('漏掉更相似的候选', 'Missed a more similar candidate'),
+    ('人工标签有歧义', 'Ambiguous human label'),
+    ('这条不算模型错误', 'Not a model error'),
+    ('其他原因', 'Other'),
+    ('场景：', 'Scene: '),
+    ('任务：', 'Task: '),
+    ('详情：', 'Details: '),
+    ('暂无', 'Unavailable'),
+    ('已分析 ', 'Reviewed '),
+    (' · 锁定测试40条', ' · 40 test queries locked'),
+    ('错题分析已完成', 'Error review complete'),
+    ('查询视频', 'Query video'),
+    ('模型第一名', 'Model top result'),
+    ('模型余弦 ', 'Model cosine '),
+    (' · 人工等级 ', ' · Human grade '),
+    ('人工认为更好的候选', 'Human-preferred candidate'),
+    ('↺ 从Task开头播放', '↺ Replay from task start'),
+    ('可选：补充具体原因', 'Optional: add details'),
+    ('保存原因并查看下一条', 'Save reason and show next'),
+    ('加载失败：', 'Loading failed: '),
+):
+    _ERROR_HTML_SAFARI = _ERROR_HTML_SAFARI.replace(_source, _target)
